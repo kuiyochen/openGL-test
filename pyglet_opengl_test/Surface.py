@@ -198,14 +198,14 @@ surface.load('surface_64-2.png', 1, 1, .1)
 surface1 = Surface()
 surface1.load('surface_64-1.png', 1, 1, .1)
 
-# data_points = np.array([[10.0, 10.0, 20], 
-#                         [13.0, 13.0, 10]])
-# data_points_color = np.array([[255, 0, 0, 255//2], 
-#                         [255, 255, 0, 255//2]])
-data_points = Point_dot()
-data_points.load(np.array([[10.0, 10.0, 20], 
-                        [13.0, 13.0, 10],
-                        [-32.0, -16.0, 11]]))
+data_points = np.array([[10.0, 10.0, 20], 
+                        [13.0, 13.0, 10]])
+data_points_color = np.array([[255, 0, 0, 255//2], 
+                        [255, 255, 0, 255//2]])
+# data_points = Point_dot()
+# data_points.load(np.array([[10.0, 10.0, 20], 
+#                         [13.0, 13.0, 10],
+#                         [-32.0, -16.0, 11]]))
 
 @window.event
 def on_resize(width, height):
@@ -232,7 +232,14 @@ def on_draw():
     # wire-frame mode
     gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
 
-    # draws the heightmap
+    # data_points.draw()
+
+    gl.glPointSize(10)
+    pyglet.graphics.draw(len(data_points), gl.GL_POINTS, #v3f/stream c4B/static
+            ('v3f', data_points.reshape(-1)),
+            ('c4B', data_points_color.reshape(-1)))
+    gl.glPointSize(1)
+
     surface.draw('b')
     surface1.draw('g')
 
@@ -243,23 +250,12 @@ def on_draw():
     gl.glVertex3f(0.0, 0.0, 20)
     gl.glEnd()
 
-    data_points.draw()
-
-    # gl.glPointSize(10)
-    # pyglet.graphics.draw(len(data_points), gl.GL_POINTS, #v3f/stream c4B/static
-    #         ('v3f', data_points.reshape(-1)),
-    #         ('c4B', data_points_color.reshape(-1)))
-    # gl.glPointSize(1)
-
 @window.event
 def on_mouse_scroll(x, y, scroll_x, scroll_y):
     # scroll the MOUSE WHEEL to zoom
     surface.surface_on_mouse_scroll(x, y, scroll_x, scroll_y)
     surface1.surface_on_mouse_scroll(x, y, scroll_x, scroll_y)
-    data_points.Point_dot_on_mouse_scroll(x, y, scroll_x, scroll_y)
-    # with np.errstate(divide='ignore', over='ignore'):
-    #     surface.z += scroll_y * 5 * (1 + 1 / (1 + np.exp((surface.z + 5) * 5)**(-1)))
-        # surface1.z += scroll_y * 5 * (1 + 1 / (1 + np.exp((surface1.z + 5) * 5)**(-1)))
+    # data_points.Point_dot_on_mouse_scroll(x, y, scroll_x, scroll_y)
 
 @window.event
 def on_mouse_drag(x, y, dx, dy, button, modifiers):
@@ -267,14 +263,14 @@ def on_mouse_drag(x, y, dx, dy, button, modifiers):
     if button == pyglet.window.mouse.LEFT and (modifiers & key.MOD_CTRL):
         surface.surface_MOD_CTRL_mouse_LEFT(x, y, dx, dy, button, modifiers)
         surface1.surface_MOD_CTRL_mouse_LEFT(x, y, dx, dy, button, modifiers)
-        data_points.Point_dot_MOD_CTRL_mouse_LEFT(x, y, dx, dy, button, modifiers)
+        # data_points.Point_dot_MOD_CTRL_mouse_LEFT(x, y, dx, dy, button, modifiers)
         return
     #   print("YOO")
     # press the LEFT and RIGHT MOUSE BUTTON simultaneously to pan
     if button == pyglet.window.mouse.MIDDLE:
         surface.surface_mouse_MIDDLE(x, y, dx, dy, button, modifiers)
         surface1.surface_mouse_MIDDLE(x, y, dx, dy, button, modifiers)
-        data_points.Point_dot_mouse_MIDDLE(x, y, dx, dy, button, modifiers)
+        # data_points.Point_dot_mouse_MIDDLE(x, y, dx, dy, button, modifiers)
 
 
         return
@@ -282,7 +278,7 @@ def on_mouse_drag(x, y, dx, dy, button, modifiers):
     if button == pyglet.window.mouse.LEFT:
         surface.surface_mouse_LEFT(x, y, dx, dy, button, modifiers)
         surface1.surface_mouse_LEFT(x, y, dx, dy, button, modifiers)
-        data_points.Point_dot_mouse_LEFT(x, y, dx, dy, button, modifiers)
+        # data_points.Point_dot_mouse_LEFT(x, y, dx, dy, button, modifiers)
 
 
 pyglet.app.run()
