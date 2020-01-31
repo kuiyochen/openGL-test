@@ -1,6 +1,7 @@
 # http://www.poketcode.com/en/pyglet_demos/index.html
 import os
 import numpy as np
+from colorsys import hsv_to_rgb
 
 from PIL import Image
 import pyglet
@@ -11,63 +12,23 @@ from pyglet.gl import glu
 class Surface:
     def __init__(self):
         self.vertices = []
-
-        # dimensions
-        self.x_length = 0
-        self.y_length = 0
-        self.z_length = 0
-
-        # image dimensions
-        self.image_width = 0
-        self.image_height = 0
-
         # translation and rotation values
         self.x = self.y = 0  # heightmap translation
         self.z = -100
         self.rx = self.ry = self.rz = 0  # heightmap rotation
 
-    def load(self, path, dx, dy, dz):
-        """ loads the vertices positions from an image """
-
-        # opens the image
-        image = Image.open(path)
-        # image dimensions
-        self.image_width, self.image_height = width, height = image.size
-        # self.image_width, self.image_height = width, height = 64, 64
-
-        # heightmap dimensions
-        self.x_length = (self.image_width - 1) * dx
-        self.y_length = (self.image_height - 1) * dy
-
-        # used for centering the heightmap
-        half_x_length = self.x_length / 2.0
-        half_y_length = self.y_length / 2.0
-
-        max_z = 0
+    def load(self, mx, my, mz, dx, dy, dz):
+        self.width, self.height = mz.shape
 
         # loads the vertices
-        for y in range(height - 1):
+        for j in range(self.height - 1):
             # a row of triangles
             row = []
-            for x in range(width):
-                # gets the red component of the pixel
-                # in a grayscale image; the red, green and blue components have the same value
-                r = np.mean(image.getpixel((x, y)))
-                # centers the heightmap and inverts the y axis
-                row.extend((x * dx - half_x_length, half_y_length - y * dy, r * dz))
-                # gets the maximum component value
-                max_z = max(max_z, r)
-
-                # gets the red component of the pixel
-                # in a grayscale image; the red, green and blue components have the same value
-                r = np.mean(image.getpixel((x, y + 1)))
-                # centers the heightmap and inverts the y axis
-                row.extend((x * dx - half_x_length, half_y_length - (y + 1) * dy, r * dz))
-                # gets the maximum component value
-                max_z = max(max_z, r)
+            for i in range(self.width):
+                row.extend((mx[i, j] * dx, - my[i, j] * dy, mz[i, j] * dz))
+                row.extend((mx[i, j + 1] * dx, - my[i, j + 1] * dy, mz[i, j + 1] * dz))
             self.vertices.append(row)
 
-        self.z_length = max_z * dz
         self.colormax = np.array(self.vertices).reshape(-1, 3)[:, 2]
         self.colormin = np.amin(self.colormax)
         self.colormax = np.amax(self.colormax)
@@ -92,7 +53,7 @@ class Surface:
                 color = np.column_stack([1 - color, np.ones_like(color), 1 - color, np.zeros_like(color) + 0.7]).reshape(-1)
 
             row = row.reshape(-1)
-            pyglet.graphics.draw(self.image_width * 2, gl.GL_TRIANGLE_STRIP, ('v3f', row), ('c4f', color))
+            pyglet.graphics.draw(self.width * 2, gl.GL_TRIANGLE_STRIP, ('v3f', row), ('c4f', color))
 
     # @window.event
     def surface_on_mouse_scroll(self, x, y, scroll_x, scroll_y):
@@ -114,25 +75,23 @@ class Surface:
 
 class Point_dot:
     def __init__(self):
-        self.points = []
-        self.tetrahedrons = []
-
         # translation and rotation values
         self.x = self.y = 0  # heightmap translation
         self.z = -100
         self.rx = self.ry = self.rz = 0  # heightmap rotation
-        self.pointsize = 1
 
-    def load(self, points):
-        self.points = points
-        for i in range(len(self.points)):
-            # a row of triangles
-            point = np.array(points[i])
-            vertices = [point + self.pointsize * np.array([2 * 1.414 / 3, 0, -1 / 3])]\
-                        + [point + self.pointsize * np.array([-1.414 / 3, 1.414 / 1.732, -1 / 3])]\
-                        + [point + self.pointsize * np.array([-1.414 / 3, -1.414 / 1.732, -1 / 3])]\
-                        + [point + self.pointsize * np.array([0, 0, 1])]
-            self.tetrahedrons.append(vertices)
+    def load(self, points, pointsize):
+        self.points = np.array(points)
+        self.pointsize = pointsize
+        self.data_points_color = self.color_plot()
+
+    def color_plot(self):
+        h = self.points[:, 2]
+        if np.max(h) == np.min(h):
+            return np.column_stack([np.ones_like(h)] * 3)
+        h = (h - np.min(h)) / (np.max(h) - np.min(h))
+        h = h * 0.8 + 0.2
+        return np.array(list(map(lambda x: hsv_to_rgb(x, 1., 1.), h)))
 
     def draw(self):
         gl.glLoadIdentity()
@@ -144,17 +103,10 @@ class Point_dot:
         # color
         gl.glColor3f(*gray)
 
-        # draws the primitives (GL_TRIANGLE_STRIP)
-        for i in range(len(self.points)):
-            tetrahedrons_verteices = self.tetrahedrons[i]
-            faces = []
-            faces.append([tetrahedrons_verteices[0], tetrahedrons_verteices[1], tetrahedrons_verteices[3]])
-            faces.append([tetrahedrons_verteices[1], tetrahedrons_verteices[2], tetrahedrons_verteices[3]])
-            faces.append([tetrahedrons_verteices[2], tetrahedrons_verteices[0], tetrahedrons_verteices[3]])
-            faces.append([tetrahedrons_verteices[0], tetrahedrons_verteices[1], tetrahedrons_verteices[2]])
-            color = [1, 0, 0, 0.5] * 4 * 3
-            faces = np.array(faces).reshape(-1)
-            pyglet.graphics.draw(4 * 3, gl.GL_TRIANGLE_STRIP, ('v3f', faces), ('c4f', color))
+        gl.glPointSize(self.pointsize)
+        pyglet.graphics.draw(len(self.points), gl.GL_POINTS, #v3f/stream c4B/static
+            ('v3f', self.points.reshape(-1)),
+            ('c3f', self.data_points_color.reshape(-1)))
 
     # @window.event
     def Point_dot_on_mouse_scroll(self, x, y, scroll_x, scroll_y):
@@ -194,18 +146,29 @@ gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
 
 # Surface
 surface = Surface()
-surface.load('surface_64-2.png', 1, 1, .1)
+# surface.load('surface_64-2.png', 1, 1, .1)
 surface1 = Surface()
-surface1.load('surface_64-1.png', 1, 1, .1)
+# surface1.load('surface_64-1.png', 1, 1, .1)
 
-data_points = np.array([[10.0, 10.0, 20], 
-                        [13.0, 13.0, 10]])
-data_points_color = np.array([[255, 0, 0, 255//2], 
-                        [255, 255, 0, 255//2]])
-# data_points = Point_dot()
-# data_points.load(np.array([[10.0, 10.0, 20], 
-#                         [13.0, 13.0, 10],
-#                         [-32.0, -16.0, 11]]))
+x = np.arange(-50, 50, 1)
+y = np.arange(-100, 100, 1)
+mx, my = np.meshgrid(x, y, indexing='ij')
+mz = (mx**2 + my**2) / (5 * 10**2) + 10
+surface.load(mx, my, mz, 1, 1, 1)
+x = np.arange(-60, 60, 1)
+y = np.arange(-60, 60, 1)
+mx1, my1 = np.meshgrid(x, y, indexing='ij')
+mz1 = ((mx1 + 30)**2 + my1**2) / (10**3) + 15
+surface1.load(mx1, my1, mz1, 1, 1, 1)
+
+# data_points = np.array([[10.0, 10.0, 20], 
+#                         [13.0, 13.0, 10]])
+# data_points_color = np.array([[255, 0, 0, 255//2], 
+#                         [255, 255, 0, 255//2]])
+data_points = Point_dot()
+data_points.load(np.column_stack([np.arange(-10, 10, 1), 
+                        np.arange(-10, 10, 1) + 10,
+                        np.arange(-10, 10, 1) + 10]), 5)
 
 @window.event
 def on_resize(width, height):
@@ -232,16 +195,13 @@ def on_draw():
     # wire-frame mode
     gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
 
-    # data_points.draw()
+    data_points.draw()
 
-    gl.glPointSize(10)
-    pyglet.graphics.draw(len(data_points), gl.GL_POINTS, #v3f/stream c4B/static
-            ('v3f', data_points.reshape(-1)),
-            ('c4B', data_points_color.reshape(-1)))
-    gl.glPointSize(1)
-
-    surface.draw('b')
-    surface1.draw('g')
+    # gl.glPointSize(10)
+    # pyglet.graphics.draw(len(data_points), gl.GL_POINTS, #v3f/stream c4B/static
+    #         ('v3f', data_points.reshape(-1)),
+    #         ('c4B', data_points_color.reshape(-1)))
+    # gl.glPointSize(1)
 
     # gl.glBegin(gl.GL_POINTS)
     gl.glBegin(gl.GL_LINES)
@@ -250,12 +210,15 @@ def on_draw():
     gl.glVertex3f(0.0, 0.0, 20)
     gl.glEnd()
 
+    surface.draw('b')
+    surface1.draw('g')
+
 @window.event
 def on_mouse_scroll(x, y, scroll_x, scroll_y):
     # scroll the MOUSE WHEEL to zoom
     surface.surface_on_mouse_scroll(x, y, scroll_x, scroll_y)
     surface1.surface_on_mouse_scroll(x, y, scroll_x, scroll_y)
-    # data_points.Point_dot_on_mouse_scroll(x, y, scroll_x, scroll_y)
+    data_points.Point_dot_on_mouse_scroll(x, y, scroll_x, scroll_y)
 
 @window.event
 def on_mouse_drag(x, y, dx, dy, button, modifiers):
@@ -263,14 +226,14 @@ def on_mouse_drag(x, y, dx, dy, button, modifiers):
     if button == pyglet.window.mouse.LEFT and (modifiers & key.MOD_CTRL):
         surface.surface_MOD_CTRL_mouse_LEFT(x, y, dx, dy, button, modifiers)
         surface1.surface_MOD_CTRL_mouse_LEFT(x, y, dx, dy, button, modifiers)
-        # data_points.Point_dot_MOD_CTRL_mouse_LEFT(x, y, dx, dy, button, modifiers)
+        data_points.Point_dot_MOD_CTRL_mouse_LEFT(x, y, dx, dy, button, modifiers)
         return
     #   print("YOO")
     # press the LEFT and RIGHT MOUSE BUTTON simultaneously to pan
     if button == pyglet.window.mouse.MIDDLE:
         surface.surface_mouse_MIDDLE(x, y, dx, dy, button, modifiers)
         surface1.surface_mouse_MIDDLE(x, y, dx, dy, button, modifiers)
-        # data_points.Point_dot_mouse_MIDDLE(x, y, dx, dy, button, modifiers)
+        data_points.Point_dot_mouse_MIDDLE(x, y, dx, dy, button, modifiers)
 
 
         return
@@ -278,7 +241,7 @@ def on_mouse_drag(x, y, dx, dy, button, modifiers):
     if button == pyglet.window.mouse.LEFT:
         surface.surface_mouse_LEFT(x, y, dx, dy, button, modifiers)
         surface1.surface_mouse_LEFT(x, y, dx, dy, button, modifiers)
-        # data_points.Point_dot_mouse_LEFT(x, y, dx, dy, button, modifiers)
+        data_points.Point_dot_mouse_LEFT(x, y, dx, dy, button, modifiers)
 
 
 pyglet.app.run()
